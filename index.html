@@ -42,7 +42,23 @@
   }
   header p{color:var(--ink-dim);font-size:15.5px;max-width:56ch;margin:0 auto;}
 
-  .track{position:relative;padding-left:34px;}
+  /* --- CSS CHO ĐỒNG HỒ --- */
+  #globalTimer {
+    display: none;
+    max-width: 280px;
+    margin: 25px auto 0;
+    background: var(--panel-2);
+    padding: 12px 20px;
+    border-radius: 50px;
+    border: 2px solid var(--accent);
+    color: var(--accent);
+    font-family: ui-monospace, monospace;
+    font-size: 16px;
+    font-weight: bold;
+    box-shadow: 0 0 15px rgba(245, 166, 35, 0.2);
+  }
+
+  .track{position:relative;padding-left:34px; margin-top: 30px;}
   .track::before{
     content:"";position:absolute;left:11px;top:6px;bottom:6px;width:2px;
     background:linear-gradient(var(--accent-dim),var(--line));
@@ -126,6 +142,11 @@
     <div class="kicker">HỆ THỐNG LỒNG TIẾNG CLOUD API</div>
     <h1>Công cụ lồng tiếng AI tự động<br>Phát triển bởi [TÊN CỦA BẠN]</h1>
     <p>Hệ thống siêu nhẹ chạy hoàn toàn trên trình duyệt. Tự động bóc băng, dịch thuật và ghép video tốc độ cao bằng sức mạnh của Gemini 3.5 Flash.</p>
+    
+    <!-- KHUNG ĐỒNG HỒ -->
+    <div id="globalTimer">
+      ⏱️ Thời gian xử lý: <span id="timeElapsed">00:00</span>
+    </div>
   </header>
 
   <div class="track">
@@ -206,6 +227,29 @@ let state = {
   apiKey:'', videoFile:null, videoBuffer:null, audioBuffer:null,
   chunkMinutes:4, voice:'Kore', segments:[], dubbedMaster:null, sampleRate:24000
 };
+
+// ---------- HỆ THỐNG ĐẾM GIỜ (MỚI) ----------
+let timerInterval = null;
+let elapsedSeconds = 0;
+
+function startTimer() {
+  $('globalTimer').style.display = 'block';
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    elapsedSeconds++;
+    const m = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
+    const s = (elapsedSeconds % 60).toString().padStart(2, '0');
+    $('timeElapsed').textContent = `${m}:${s}`;
+  }, 1000);
+}
+
+function stopTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+}
+// --------------------------------------------
 
 // ---------- UI helpers ----------
 function log(stepEl, msg, cls){
@@ -356,7 +400,7 @@ async function uploadFileToGemini(blob, mimeType, displayName){
   return file;
 }
 
-// ĐÃ SỬA LỖI CORS Ở HÀM NÀY
+// ĐÃ SỬA LỖI CORS 
 async function transcribeAndTranslateChunk(fileUri, mimeType, offsetSec){
   const prompt = `Bạn là biên dịch phim chuyên nghiệp, chuyên viết lời thoại lồng tiếng cho phòng thu. Nghe đoạn audio này và trả về DUY NHẤT một mảng JSON hợp lệ, không kèm giải thích, không dùng markdown code fence. Mỗi phần tử có dạng:
 {"start": <giây, số thực, tính từ đầu đoạn audio này>, "end": <giây>, "original": "<lời thoại gốc>", "vietnamese": "<bản dịch>"}
@@ -386,4 +430,290 @@ Chia theo từng câu tự nhiên. Nếu không có lời thoại, trả về m�
   const rawText = extractText(data);
   let parsed;
   try{
-    const cleaned = rawText.replace(/```json|
+    const cleaned = rawText.replace(/```json|```/g,'').trim();
+    parsed = JSON.parse(cleaned);
+  }catch(e){
+    throw new Error('Định dạng dữ liệu trả về bị lỗi.');
+  }
+  return parsed.map(s=>({
+    start: s.start + offsetSec,
+    end: s.end + offsetSec,
+    original: s.original,
+    vietnamese: s.vietnamese
+  }));
+}
+
+function extractText(data){
+  if(data.output_text) return data.output_text;
+  if(data.output){
+    for(const item of data.output){
+      if(item.content){
+        for(const c of item.content){
+          if(c.type==='text' || c.text) return c.text || c.content;
+        }
+      }
+      if(item.text) return item.text;
+    }
+  }
+  if(data.candidates){
+    const parts = data.candidates[0]?.content?.parts;
+    if(parts) return parts.map(p=>p.text).filter(Boolean).join('');
+  }
+  throw new Error('Lỗi phản hồi từ hệ thống phân tích.');
+}
+
+function extractAudioBase64(data){
+  if(data.output){
+    for(const item of data.output){
+      if(item.content){
+        for(const c of item.content){
+          if(c.audio?.data) return c.audio.data;
+          if(c.inline_data?.data) return c.inline_data.data;
+          if(c.type==='audio' && c.data) return c.data;
+        }
+      }
+    }
+  }
+  if(data.candidates){
+    const parts = data.candidates[0]?.content?.parts;
+    if(parts){
+      for(const p of parts){
+        if(p.inlineData?.data) return p.inlineData.data;
+        if(p.inline_data?.data) return p.inline_data.data;
+      }
+    }
+  }
+  throw new Error('Lỗi phản hồi từ hệ thống giọng nói.');
+}
+
+// ĐÃ SỬA LỖI CORS 
+async function ttsGenerate(text){
+  const res = await fetch(`${API_BASE}/v1beta/interactions?key=${state.apiKey}`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      model:'gemini-3.1-flash-tts-preview',
+      input: `Nói bằng tiếng Việt, giọng tự nhiên, tốc độ vừa phải, rõ ràng: ${text}`,
+      response_format:{type:'audio'},
+      generation_config:{speech_config:[{voice: state.voice}]}
+    })
+  });
+  if(!res.ok) throw new Error('Lỗi tạo giọng đọc: ' + await res.text());
+  const data = await res.json();
+  const b64 = extractAudioBase64(data);
+  return b64;
+}
+
+// ---------- Pipeline ----------
+$('btnStart1').addEventListener('click', async ()=>{
+  state.apiKey = $('apiKey').value.trim();
+  state.voice = $('voiceSel').value;
+  state.chunkMinutes = parseFloat($('chunkLen').value) || 4;
+  if(!state.apiKey){ alert('Vui lòng nhập Gemini API Key!'); return; }
+  if(!state.videoFile){ alert('Vui lòng tải lên một Video!'); return; }
+  
+  // Khởi động đồng hồ
+  elapsedSeconds = 0;
+  startTimer();
+
+  $('btnStart1').disabled = true;
+  unlock('step2');
+  const logEl = $('log2');
+  try{
+    log(logEl,'⏳ Đang bóc tách âm thanh từ video gốc...');
+    const rawBuf = await decodeVideoAudio(state.videoFile);
+    log(logEl,`✅ Âm thanh chuẩn: ${rawBuf.duration.toFixed(1)}s`, 'ok');
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    state.videoDuration = rawBuf.duration;
+
+    const chunkSec = state.chunkMinutes*60;
+    const numChunks = Math.ceil(rawBuf.duration/chunkSec);
+    let allSegments = [];
+
+    for(let i=0;i<numChunks;i++){
+      const startSec = i*chunkSec;
+      const endSec = Math.min(rawBuf.duration, startSec+chunkSec);
+      log(logEl, `🔄 Đoạn ${i+1}/${numChunks}: Cắt audio (${startSec.toFixed(0)}s–${endSec.toFixed(0)}s)...`);
+      const sliced = sliceBuffer(rawBuf, startSec, endSec, ctx);
+      const mono16k = await downmixToMono16k(sliced, ctx);
+      const wavBlob = audioBufferToWav(mono16k);
+
+      log(logEl, `☁️ Đẩy lên Cloud (Đoạn ${i+1})...`);
+      const file = await uploadFileToGemini(wavBlob, 'audio/wav', `chunk-${i}.wav`);
+      log(logEl, `🤖 AI đang bóc băng & dịch thuật...`);
+      const segs = await transcribeAndTranslateChunk(file.uri, file.mimeType || 'audio/wav', startSec);
+      log(logEl, `✅ Xong! Tìm thấy ${segs.length} câu thoại.`, 'ok');
+      allSegments = allSegments.concat(segs);
+      setBar('bar2', ((i+1)/numChunks)*100);
+    }
+
+    state.segments = allSegments;
+    renderSegTable(allSegments);
+    markDone('step2');
+    $('btnToStep3').style.display = 'inline-block';
+    
+    // Tạm dừng đồng hồ chờ người dùng xác nhận kịch bản
+    stopTimer();
+
+  }catch(err){
+    log(logEl, '❌ ' + err.message, 'e');
+    $('btnStart1').disabled = false;
+    stopTimer(); // Dừng nếu có lỗi
+  }
+});
+
+$('btnToStep3').addEventListener('click', ()=>{
+  $('btnToStep3').disabled = true;
+  unlock('step3');
+  startTimer(); // Bật lại đồng hồ
+  runTTSStep();
+});
+
+function renderSegTable(segments){
+  const el = $('segtable2');
+  el.style.display = 'block';
+  el.innerHTML = '<div class="seg head"><div>Giây</div><div>Thoại Gốc</div><div>Bản Dịch Tiếng Việt (Bấm để sửa)</div><div>Tình trạng</div></div>';
+  segments.forEach((s,idx)=>{
+    const row = document.createElement('div');
+    row.className = 'seg';
+    row.id = 'seg-'+idx;
+    const viCell = document.createElement('div');
+    viCell.contentEditable = 'true';
+    viCell.textContent = s.vietnamese || '';
+    viCell.style.cssText = 'outline:none;border-radius:4px;padding:2px 4px;';
+    viCell.addEventListener('focus', ()=> viCell.style.background = 'var(--panel-2)');
+    viCell.addEventListener('blur', ()=>{ viCell.style.background = 'transparent'; state.segments[idx].vietnamese = viCell.textContent.trim(); });
+    row.innerHTML = `<div class="t">${s.start.toFixed(0)}s</div><div>${escapeHtml(s.original||'')}</div>`;
+    row.appendChild(viCell);
+    const stCell = document.createElement('div');
+    stCell.innerHTML = '<span class="st">Chờ lồng tiếng</span>';
+    row.appendChild(stCell);
+    el.appendChild(row);
+  });
+}
+function escapeHtml(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function setSegStatus(idx, text, cls){
+  const row = $('seg-'+idx);
+  if(!row) return;
+  const st = row.querySelector('.st');
+  st.textContent = text;
+  st.className = 'st ' + (cls||'');
+}
+
+async function runTTSStep(){
+  const logEl = $('log3');
+  const ctx = new (window.AudioContext||window.webkitAudioContext)();
+  const sr = state.sampleRate;
+  const totalDur = state.videoDuration;
+  const master = ctx.createBuffer(1, Math.ceil(totalDur*sr)+sr, sr);
+  const masterData = master.getChannelData(0);
+
+  for(let i=0;i<state.segments.length;i++){
+    const seg = state.segments[i];
+    if(!seg.vietnamese || !seg.vietnamese.trim()){ setSegStatus(i,'Bỏ qua'); continue; }
+    setSegStatus(i,'Đang đọc','run');
+    try{
+      const b64 = await ttsGenerate(seg.vietnamese);
+      const segBuf = pcm16ToAudioBuffer(b64, sr, ctx);
+      const startSample = Math.floor(seg.start*sr);
+      const segData = segBuf.getChannelData(0);
+      for(let j=0;j<segData.length && (startSample+j)<masterData.length; j++){
+        masterData[startSample+j] += segData[j];
+      }
+      setSegStatus(i,'Thành công','ok');
+      log(logEl, `🎙️ [${seg.start.toFixed(0)}s] ${seg.vietnamese.slice(0,40)}...`, 'ok');
+    }catch(err){
+      setSegStatus(i,'Lỗi','err');
+      log(logEl, `❌ [${seg.start.toFixed(0)}s] ${err.message}`, 'e');
+    }
+    setBar('bar3', ((i+1)/state.segments.length)*100);
+  }
+  state.dubbedMaster = master;
+  markDone('step3');
+  unlock('step4');
+
+  const wav = audioBufferToWav(master);
+  addDownload('📥 Tải riêng File Âm thanh (.wav)', URL.createObjectURL(wav), 'audio-long-tieng.wav');
+  
+  // Tạm dừng đồng hồ chờ bấm xuất video
+  stopTimer();
+}
+
+$('btnRender').addEventListener('click', renderFinalVideo);
+
+async function renderFinalVideo(){
+  const logEl = $('log4');
+  $('btnRender').disabled = true;
+  startTimer(); // Bật lại đồng hồ lúc render
+  
+  try{
+    const video = document.createElement('video');
+    video.src = URL.createObjectURL(state.videoFile);
+    video.muted = false; 
+    await new Promise(r=> video.onloadedmetadata = r);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const cctx = canvas.getContext('2d');
+
+    const actx = new (window.AudioContext||window.webkitAudioContext)();
+    const dest = actx.createMediaStreamDestination();
+    const src = actx.createBufferSource();
+    src.buffer = state.dubbedMaster;
+    src.connect(dest);
+
+    const canvasStream = canvas.captureStream(30);
+    const combined = new MediaStream([...canvasStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+
+    const chunks = [];
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' : 'video/webm';
+    const recorder = new MediaRecorder(combined, {mimeType});
+    recorder.ondataavailable = e=>{ if(e.data.size>0) chunks.push(e.data); };
+
+    const donePromise = new Promise(resolve=>{ recorder.onstop = resolve; });
+
+    log(logEl, `🎬 Bắt đầu render Video (~${state.videoDuration.toFixed(0)}s, vui lòng giữ màn hình sáng)...`);
+    video.currentTime = 0;
+    video.volume = 0; 
+    recorder.start();
+    src.start();
+    await video.play();
+
+    const drawLoop = ()=>{
+      if(video.ended || video.paused) return;
+      cctx.drawImage(video,0,0,canvas.width,canvas.height);
+      setBar('bar4', (video.currentTime/state.videoDuration)*100);
+      requestAnimationFrame(drawLoop);
+    };
+    drawLoop();
+
+    video.onended = ()=>{ recorder.stop(); };
+    await donePromise;
+
+    const blob = new Blob(chunks, {type:'video/webm'});
+    log(logEl, '🎉 Đã Render Xong Video Lồng Tiếng!', 'ok');
+    addDownload('📥 TẢI VIDEO LỒNG TIẾNG (.webm)', URL.createObjectURL(blob), 'video-long-tieng.webm');
+    setBar('bar4',100);
+    
+    // Tắt hẳn đồng hồ khi xong nhiệm vụ
+    stopTimer();
+    
+  }catch(err){
+    log(logEl, '❌ ' + err.message, 'e');
+    stopTimer();
+  }
+  $('btnRender').disabled = false;
+}
+
+function addDownload(label, url, filename){
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.textContent = label;
+  a.style.cssText = 'display:inline-block;background:var(--accent);border:none;color:#000;font-weight:bold;padding:12px 20px;border-radius:8px;text-decoration:none;font-size:14px; margin-right: 10px; margin-bottom: 10px; transition: 0.2s;';
+  a.onmouseover = function() { this.style.background = '#ffbc4b'; };
+  a.onmouseout = function() { this.style.background = 'var(--accent)'; };
+  $('downloads').appendChild(a);
+}
+</script>
+</body>
+</html>

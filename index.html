@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phòng Lồng Tiếng — Gemini</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#14121a;
+    --panel:#1c1926;
+    --panel-2:#231f30;
+    --line:#332e42;
+    --ink:#ece8f5;
+    --ink-dim:#a89fc2;
+    --accent:#8b6bff;
+    --accent-dim:#5a4a94;
+    --amber:#e8a33d;
+    --ok:#5ecb8f;
+    --err:#e8615c;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:40px 20px 100px;}
+  header{margin-bottom:44px;}
+  header .kicker{color:var(--amber);font-size:14px;font-weight:600;margin-bottom:10px;}
+  h1{
+    font-family:'Fraunces',serif;
+    font-weight:500;
+    font-size:38px;
+    line-height:1.15;
+    margin:0 0 14px;
+    letter-spacing:-0.01em;
+  }
+  header p{color:var(--ink-dim);font-size:15.5px;max-width:56ch;margin:0;}
+
+  .track{position:relative;padding-left:34px;}
+  .track::before{
+    content:"";position:absolute;left:11px;top:6px;bottom:6px;width:2px;
+    background:linear-gradient(var(--accent-dim),var(--line));
+  }
+  .step{position:relative;margin-bottom:22px;}
+  .step-dot{
+    position:absolute;left:-34px;top:22px;width:24px;height:24px;border-radius:50%;
+    background:var(--panel-2);border:2px solid var(--line);
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:700;color:var(--ink-dim);
+    transition:all .25s ease;
+  }
+  .step.active .step-dot{border-color:var(--accent);color:var(--accent);background:#241f38;}
+  .step.done .step-dot{border-color:var(--ok);background:var(--ok);color:#0d1f16;}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:22px 24px;
+  }
+  .step h2{font-family:'Fraunces',serif;font-weight:500;font-size:20px;margin:0 0 4px;}
+  .step .sub{color:var(--ink-dim);font-size:13.5px;margin-bottom:16px;}
+  .step.locked .card{opacity:.45;pointer-events:none;}
+
+  label{display:block;font-size:13px;color:var(--ink-dim);margin-bottom:6px;font-weight:500;}
+  input[type="password"], input[type="text"], select, textarea{
+    width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
+    border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit;
+  }
+  input:focus, select:focus, textarea:focus{outline:none;border-color:var(--accent);}
+  .row{display:flex;gap:12px;flex-wrap:wrap;}
+  .row > div{flex:1;min-width:160px;}
+
+  .filedrop{
+    border:1.5px dashed var(--line);border-radius:10px;padding:22px;text-align:center;
+    color:var(--ink-dim);font-size:14px;cursor:pointer;margin-top:14px;transition:border-color .2s;
+  }
+  .filedrop:hover{border-color:var(--accent-dim);}
+  .filedrop.has-file{border-style:solid;border-color:var(--ok);color:var(--ink);}
+
+  button{
+    background:var(--accent);color:#fff;border:none;border-radius:8px;
+    padding:11px 20px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;
+    margin-top:16px;
+  }
+  button:hover{background:#7a58f5;}
+  button:disabled{background:var(--line);color:var(--ink-dim);cursor:not-allowed;}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--ink);}
+  button.ghost:hover{border-color:var(--accent);background:transparent;}
+
+  .bar{height:6px;background:var(--panel-2);border-radius:3px;overflow:hidden;margin-top:14px;}
+  .bar-fill{height:100%;background:var(--accent);width:0%;transition:width .3s ease;}
+
+  .log{
+    margin-top:14px;background:#100e17;border:1px solid var(--line);border-radius:8px;
+    padding:10px 12px;font-family:ui-monospace,monospace;font-size:12px;color:var(--ink-dim);
+    max-height:150px;overflow-y:auto;
+  }
+  .log div{margin-bottom:3px;white-space:pre-wrap;}
+  .log .e{color:var(--err);}
+  .log .ok{color:var(--ok);}
+
+  .segtable{margin-top:14px;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .seg{display:grid;grid-template-columns:52px 1fr 1fr 70px;gap:10px;padding:9px 12px;font-size:12.5px;border-bottom:1px solid var(--line);align-items:center;}
+  .seg:last-child{border-bottom:none;}
+  .seg.head{background:var(--panel-2);color:var(--ink-dim);font-weight:600;}
+  .seg .t{color:var(--ink-dim);font-variant-numeric:tabular-nums;}
+  .seg .st{font-size:11px;padding:2px 7px;border-radius:20px;text-align:center;background:var(--panel-2);color:var(--ink-dim);}
+  .seg .st.ok{background:rgba(94,203,143,.15);color:var(--ok);}
+  .seg .st.err{background:rgba(232,97,92,.15);color:var(--err);}
+  .seg .st.run{background:rgba(139,107,255,.15);color:var(--accent);}
+
+  .note{font-size:12.5px;color:var(--ink-dim);background:var(--panel-2);border-radius:8px;padding:10px 12px;margin-top:14px;border-left:2px solid var(--amber);}
+  .dl{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
+  video{width:100%;border-radius:10px;margin-top:14px;background:#000;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="kicker">PHÒNG LỒNG TIẾNG</div>
+    <h1>Dịch và lồng tiếng Việt cho phim, dùng Gemini</h1>
+    <p>Công cụ chạy hoàn toàn trong trình duyệt của bạn: nghe hiểu lời thoại gốc, dịch sang tiếng Việt, tạo giọng đọc, rồi ghép lại vào video — mỗi bước dùng một mô hình Gemini chuyên biệt.</p>
+  </header>
+
+  <div class="track">
+
+    <!-- STEP 1 -->
+    <div class="step active" id="step1">
+      <div class="step-dot">1</div>
+      <div class="card">
+        <h2>Video &amp; API key</h2>
+        <div class="sub">Dán Gemini API key (chỉ lưu trong bộ nhớ trình duyệt, không gửi đi đâu khác ngoài Google) và chọn file video.</div>
+        <label for="apiKey">Gemini API key</label>
+        <input type="password" id="apiKey" placeholder="AIza...">
+        <div class="filedrop" id="dropZone">Bấm để chọn file video (mp4, webm, mov...)</div>
+        <input type="file" id="videoInput" accept="video/*" style="display:none">
+        <video id="preview" style="display:none" controls></video>
+        <label for="voiceSel" style="margin-top:14px">Giọng đọc tiếng Việt</label>
+        <select id="voiceSel">
+          <option value="Kore">Kore — nữ, trầm ổn</option>
+          <option value="Puck">Puck — nam, trẻ</option>
+          <option value="Charon">Charon — nam, trầm</option>
+          <option value="Zephyr">Zephyr — nữ, sáng</option>
+          <option value="Fenrir">Fenrir — nam, mạnh</option>
+        </select>
+        <details style="margin-top:14px">
+          <summary style="cursor:pointer;color:var(--ink-dim);font-size:13px;">Tuỳ chọn nâng cao</summary>
+          <div style="margin-top:10px">
+            <label for="chunkLen">Độ dài mỗi đoạn xử lý (phút) — phim dài nên để 3-5</label>
+            <input type="text" id="chunkLen" value="4">
+          </div>
+        </details>
+        <button id="btnStart1">Bắt đầu: Tách &amp; nghe hiểu âm thanh</button>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step locked" id="step2">
+      <div class="step-dot">2</div>
+      <div class="card">
+        <h2>Nghe hiểu &amp; dịch sang tiếng Việt</h2>
+        <div class="sub">Gemini nghe từng đoạn audio, tách lời thoại theo mốc thời gian, và dịch sang tiếng Việt tự nhiên cho lồng tiếng. Bạn có thể bấm vào cột tiếng Việt để sửa lại câu nào chưa ưng trước khi tạo giọng đọc.</div>
+        <div class="bar"><div class="bar-fill" id="bar2"></div></div>
+        <div class="log" id="log2"></div>
+        <div class="segtable" id="segtable2" style="display:none"></div>
+        <button id="btnToStep3" style="display:none">Xác nhận bản dịch, tạo giọng đọc →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step locked" id="step3">
+      <div class="step-dot">3</div>
+      <div class="card">
+        <h2>Tạo giọng đọc tiếng Việt</h2>
+        <div class="sub">Từng câu thoại tiếng Việt được đưa qua Gemini TTS để tạo giọng nói.</div>
+        <div class="bar"><div class="bar-fill" id="bar3"></div></div>
+        <div class="log" id="log3"></div>
+      </div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="step locked" id="step4">
+      <div class="step-dot">4</div>
+      <div class="card">
+        <h2>Ghép lại thành video</h2>
+        <div class="sub">Phát video gốc (tắt tiếng) cùng lúc với âm thanh lồng tiếng mới và ghi lại thành file video hoàn chỉnh. Bước này chạy theo thời gian thực — video dài bao lâu thì chờ bấy lâu, đừng tắt tab.</div>
+        <button id="btnRender">Ghi video lồng tiếng</button>
+        <div class="bar"><div class="bar-fill" id="bar4"></div></div>
+        <div class="log" id="log4"></div>
+        <div class="dl" id="downloads"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let state = {
+  apiKey:'', videoFile:null, videoBuffer:null, audioBuffer:null,
+  chunkMinutes:4, voice:'Kore', segments:[], dubbedMaster:null, sampleRate:24000
+};
+
+// ---------- UI helpers ----------
+function log(stepEl, msg, cls){
+  const d = document.createElement('div');
+  if(cls) d.className = cls;
+  d.textContent = msg;
+  stepEl.appendChild(d);
+  stepEl.scrollTop = stepEl.scrollHeight;
+}
+function unlock(stepId){ $(stepId).classList.remove('locked'); $(stepId).classList.add('active'); }
+function markDone(stepId){ $(stepId).classList.remove('active'); $(stepId).classList.add('done'); }
+function setBar(id, pct){ $(id).style.width = Math.max(0,Math.min(100,pct)) + '%'; }
+
+$('dropZone').addEventListener('click', ()=> $('videoInput').click());
+$('videoInput').addEventListener('change', e=>{
+  const f = e.target.files[0];
+  if(!f) return;
+  state.videoFile = f;
+  $('dropZone').textContent = '✓ ' + f.name;
+  $('dropZone').classList.add('has-file');
+  $('preview').src = URL.createObjectURL(f);
+  $('preview').style.display = 'block';
+});
+
+// ---------- Audio utils ----------
+async function decodeVideoAudio(file){
+  const arr = await file.arrayBuffer();
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const buf = await ctx.decodeAudioData(arr.slice(0));
+  return buf;
+}
+function sliceBuffer(buffer, startSec, endSec, ctx){
+  const sr = buffer.sampleRate;
+  const startSample = Math.floor(startSec*sr);
+  const endSample = Math.min(buffer.length, Math.floor(endSec*sr));
+  const len = Math.max(0, endSample-startSample);
+  const out = ctx.createBuffer(buffer.numberOfChannels, len, sr);
+  for(let ch=0; ch<buffer.numberOfChannels; ch++){
+    out.copyToChannel(buffer.getChannelData(ch).subarray(startSample,endSample), ch);
+  }
+  return out;
+}
+function downmixToMono16k(buffer, ctx){
+  // simple resample via OfflineAudioContext
+  return new Promise(async (resolve)=>{
+    const targetSr = 16000;
+    const off = new OfflineAudioContext(1, Math.ceil(buffer.duration*targetSr), targetSr);
+    const src = off.createBufferSource();
+    // mixdown to mono first if needed
+    let monoBuf = buffer;
+    if(buffer.numberOfChannels > 1){
+      monoBuf = off.createBuffer(1, buffer.length, buffer.sampleRate);
+      const data = monoBuf.getChannelData(0);
+      for(let ch=0; ch<buffer.numberOfChannels; ch++){
+        const chData = buffer.getChannelData(ch);
+        for(let i=0;i<chData.length;i++) data[i] = (data[i]||0) + chData[i]/buffer.numberOfChannels;
+      }
+    }
+    src.buffer = monoBuf;
+    src.connect(off.destination);
+    src.start();
+    const rendered = await off.startRendering();
+    resolve(rendered);
+  });
+}
+function audioBufferToWav(buffer){
+  const numCh = buffer.numberOfChannels, sr = buffer.sampleRate;
+  const len = buffer.length * numCh * 2 + 44;
+  const ab = new ArrayBuffer(len);
+  const view = new DataView(ab);
+  function writeStr(off, s){ for(let i=0;i<s.length;i++) view.setUint8(off+i, s.charCodeAt(i)); }
+  writeStr(0,'RIFF'); view.setUint32(4, 36 + buffer.length*numCh*2, true);
+  writeStr(8,'WAVE'); writeStr(12,'fmt ');
+  view.setUint32(16,16,true); view.setUint16(20,1,true);
+  view.setUint16(22,numCh,true); view.setUint32(24,sr,true);
+  view.setUint32(28, sr*numCh*2, true); view.setUint16(32, numCh*2, true);
+  view.setUint16(34,16,true); writeStr(36,'data');
+  view.setUint32(40, buffer.length*numCh*2, true);
+  let offset = 44;
+  for(let i=0;i<buffer.length;i++){
+    for(let ch=0; ch<numCh; ch++){
+      let s = Math.max(-1, Math.min(1, buffer.getChannelData(ch)[i]));
+      view.setInt16(offset, s<0 ? s*0x8000 : s*0x7FFF, true);
+      offset += 2;
+    }
+  }
+  return new Blob([ab], {type:'audio/wav'});
+}
+function blobToBase64(blob){
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = ()=> res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+}
+function pcm16ToAudioBuffer(base64, sampleRate, ctx){
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  const view = new DataView(bytes.buffer);
+  const numSamples = bytes.length/2;
+  const buf = ctx.createBuffer(1, numSamples, sampleRate);
+  const data = buf.getChannelData(0);
+  for(let i=0;i<numSamples;i++){
+    data[i] = view.getInt16(i*2, true) / 32768;
+  }
+  return buf;
+}
+
+// ---------- Gemini calls ----------
+const API_BASE = 'https://generativelanguage.googleapis.com';
+
+async function uploadFileToGemini(blob, mimeType, displayName){
+  const startRes = await fetch(`${API_BASE}/upload/v1beta/files?key=${state.apiKey}`, {
+    method:'POST',
+    headers:{
+      'X-Goog-Upload-Protocol':'resumable',
+      'X-Goog-Upload-Command':'start',
+      'X-Goog-Upload-Header-Content-Length': blob.size,
+      'X-Goog-Upload-Header-Content-Type': mimeType,
+      'Content-Type':'application/json'
+    },
+    body: JSON.stringify({file:{display_name:displayName}})
+  });
+  if(!startRes.ok) throw new Error('Upload start lỗi: ' + await startRes.text());
+  const uploadUrl = startRes.headers.get('X-Goog-Upload-URL');
+  if(!uploadUrl) throw new Error('Không nhận được upload URL từ Gemini.');
+
+  const finalizeRes = await fetch(uploadUrl, {
+    method:'POST',
+    headers:{
+      'Content-Length': blob.size,
+      'X-Goog-Upload-Offset':'0',
+      'X-Goog-Upload-Command':'upload, finalize'
+    },
+    body: blob
+  });
+  if(!finalizeRes.ok) throw new Error('Upload finalize lỗi: ' + await finalizeRes.text());
+  const fileInfo = await finalizeRes.json();
+  let file = fileInfo.file;
+  // poll until ACTIVE
+  let tries = 0;
+  while(file.state === 'PROCESSING' && tries < 30){
+    await new Promise(r=>setTimeout(r,1500));
+    const check = await fetch(`${API_BASE}/v1beta/${file.name}?key=${state.apiKey}`);
+    file = await check.json();
+    tries++;
+  }
+  return file; // {uri, mimeType, ...}
+}
+
+async function transcribeAndTranslateChunk(fileUri, mimeType, offsetSec){
+  const prompt = `Bạn là biên dịch phim chuyên nghiệp, chuyên viết lời thoại lồng tiếng cho phòng thu. Nghe đoạn audio này và trả về DUY NHẤT một mảng JSON hợp lệ, không kèm giải thích, không dùng markdown code fence. Mỗi phần tử có dạng:
+{"start": <giây, số thực, tính từ đầu đoạn audio này>, "end": <giây>, "original": "<lời thoại gốc>", "vietnamese": "<bản dịch>"}
+
+Yêu cầu cho phần "vietnamese":
+- Dịch thoát ý, viết như người Việt nói chuyện thật ngoài đời, KHÔNG dịch word-by-word hay theo văn viết.
+- Giữ đúng sắc thái cảm xúc, ngữ khí (đùa cợt, tức giận, trang trọng...) và mức độ thân mật của nhân vật.
+- Thành ngữ, tiếng lóng, cách chơi chữ của ngôn ngữ gốc → chuyển thành thành ngữ/cách nói tương đương trong tiếng Việt, không dịch cứng.
+- Độ dài câu nói tiếng Việt nên tương đương thời lượng câu gốc (không thêm giải thích dài dòng) để khi đọc thành giọng khớp nhịp phim.
+- Xưng hô nhân vật (tôi/tao/anh/em/ông/bà...) chọn theo đúng quan hệ và bối cảnh trong đoạn thoại.
+
+Chia theo từng câu hoặc cụm lời thoại ngắn tự nhiên (như cách chia câu thoại trong kịch bản phim). Nếu không có lời thoại, trả về mảng rỗng [].`;
+
+  const res = await fetch(`${API_BASE}/v1beta/interactions`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-goog-api-key':state.apiKey,'Api-Revision':'2026-05-20'},
+    body: JSON.stringify({
+      model:'gemini-3.5-flash',
+      input:[
+        {type:'text', text:prompt},
+        {type:'audio', uri:fileUri, mime_type:mimeType}
+      ]
+    })
+  });
+  if(!res.ok) throw new Error('Transcribe lỗi: ' + await res.text());
+  const data = await res.json();
+  const rawText = extractText(data);
+  let parsed;
+  try{
+    const cleaned = rawText.replace(/```json|```/g,'').trim();
+    parsed = JSON.parse(cleaned);
+  }catch(e){
+    throw new Error('Không parse được JSON từ Gemini: ' + rawText.slice(0,200));
+  }
+  return parsed.map(s=>({
+    start: s.start + offsetSec,
+    end: s.end + offsetSec,
+    original: s.original,
+    vietnamese: s.vietnamese
+  }));
+}
+
+function extractText(data){
+  // best-effort extraction across possible response shapes
+  if(data.output_text) return data.output_text;
+  if(data.output){
+    for(const item of data.output){
+      if(item.content){
+        for(const c of item.content){
+          if(c.type==='text' || c.text) return c.text || c.content;
+        }
+      }
+      if(item.text) return item.text;
+    }
+  }
+  if(data.candidates){
+    const parts = data.candidates[0]?.content?.parts;
+    if(parts) return parts.map(p=>p.text).filter(Boolean).join('');
+  }
+  throw new Error('Không tìm thấy text trong phản hồi: ' + JSON.stringify(data).slice(0,300));
+}
+
+function extractAudioBase64(data){
+  if(data.output){
+    for(const item of data.output){
+      if(item.content){
+        for(const c of item.content){
+          if(c.audio?.data) return c.audio.data;
+          if(c.inline_data?.data) return c.inline_data.data;
+          if(c.type==='audio' && c.data) return c.data;
+        }
+      }
+    }
+  }
+  if(data.candidates){
+    const parts = data.candidates[0]?.content?.parts;
+    if(parts){
+      for(const p of parts){
+        if(p.inlineData?.data) return p.inlineData.data;
+        if(p.inline_data?.data) return p.inline_data.data;
+      }
+    }
+  }
+  throw new Error('Không tìm thấy audio trong phản hồi: ' + JSON.stringify(data).slice(0,300));
+}
+
+async function ttsGenerate(text){
+  const res = await fetch(`${API_BASE}/v1beta/interactions`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-goog-api-key':state.apiKey,'Api-Revision':'2026-05-20'},
+    body: JSON.stringify({
+      model:'gemini-3.1-flash-tts-preview',
+      input: `Nói bằng tiếng Việt, giọng tự nhiên, tốc độ vừa phải, rõ ràng: ${text}`,
+      response_format:{type:'audio'},
+      generation_config:{speech_config:[{voice: state.voice}]}
+    })
+  });
+  if(!res.ok) throw new Error('TTS lỗi: ' + await res.text());
+  const data = await res.json();
+  const b64 = extractAudioBase64(data);
+  return b64;
+}
+
+// ---------- Pipeline ----------
+$('btnStart1').addEventListener('click', async ()=>{
+  state.apiKey = $('apiKey').value.trim();
+  state.voice = $('voiceSel').value;
+  state.chunkMinutes = parseFloat($('chunkLen').value) || 4;
+  if(!state.apiKey){ alert('Nhập Gemini API key trước đã.'); return; }
+  if(!state.videoFile){ alert('Chọn file video trước đã.'); return; }
+  $('btnStart1').disabled = true;
+  unlock('step2');
+  const logEl = $('log2');
+  try{
+    log(logEl,'Đang giải mã âm thanh từ video...');
+    const rawBuf = await decodeVideoAudio(state.videoFile);
+    log(logEl,`✓ Âm thanh: ${rawBuf.duration.toFixed(1)}s, ${rawBuf.numberOfChannels} kênh, ${rawBuf.sampleRate}Hz`, 'ok');
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    state.videoDuration = rawBuf.duration;
+
+    const chunkSec = state.chunkMinutes*60;
+    const numChunks = Math.ceil(rawBuf.duration/chunkSec);
+    let allSegments = [];
+
+    for(let i=0;i<numChunks;i++){
+      const startSec = i*chunkSec;
+      const endSec = Math.min(rawBuf.duration, startSec+chunkSec);
+      log(logEl, `Đoạn ${i+1}/${numChunks}: chuẩn bị audio (${startSec.toFixed(0)}s–${endSec.toFixed(0)}s)...`);
+      const sliced = sliceBuffer(rawBuf, startSec, endSec, ctx);
+      const mono16k = await downmixToMono16k(sliced, ctx);
+      const wavBlob = audioBufferToWav(mono16k);
+
+      log(logEl, `Đoạn ${i+1}/${numChunks}: tải lên Gemini...`);
+      const file = await uploadFileToGemini(wavBlob, 'audio/wav', `chunk-${i}.wav`);
+      log(logEl, `Đoạn ${i+1}/${numChunks}: đang nghe hiểu + dịch...`);
+      const segs = await transcribeAndTranslateChunk(file.uri, file.mimeType || 'audio/wav', startSec);
+      log(logEl, `✓ Đoạn ${i+1}/${numChunks}: tìm thấy ${segs.length} câu thoại`, 'ok');
+      allSegments = allSegments.concat(segs);
+      setBar('bar2', ((i+1)/numChunks)*100);
+    }
+
+    state.segments = allSegments;
+    renderSegTable(allSegments);
+    markDone('step2');
+    $('btnToStep3').style.display = 'inline-block';
+  }catch(err){
+    log(logEl, '✗ ' + err.message, 'e');
+    console.error(err);
+  }
+});
+
+$('btnToStep3').addEventListener('click', ()=>{
+  $('btnToStep3').disabled = true;
+  unlock('step3');
+  runTTSStep();
+});
+
+function renderSegTable(segments){
+  const el = $('segtable2');
+  el.style.display = 'block';
+  el.innerHTML = '<div class="seg head"><div>Giây</div><div>Gốc</div><div>Tiếng Việt (bấm để sửa)</div><div>TTS</div></div>';
+  segments.forEach((s,idx)=>{
+    const row = document.createElement('div');
+    row.className = 'seg';
+    row.id = 'seg-'+idx;
+    const viCell = document.createElement('div');
+    viCell.contentEditable = 'true';
+    viCell.textContent = s.vietnamese || '';
+    viCell.style.cssText = 'outline:none;border-radius:4px;padding:2px 4px;';
+    viCell.addEventListener('focus', ()=> viCell.style.background = 'var(--panel-2)');
+    viCell.addEventListener('blur', ()=>{ viCell.style.background = 'transparent'; state.segments[idx].vietnamese = viCell.textContent.trim(); });
+    row.innerHTML = `<div class="t">${s.start.toFixed(0)}s</div><div>${escapeHtml(s.original||'')}</div>`;
+    row.appendChild(viCell);
+    const stCell = document.createElement('div');
+    stCell.innerHTML = '<span class="st">chờ</span>';
+    row.appendChild(stCell);
+    el.appendChild(row);
+  });
+}
+function escapeHtml(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function setSegStatus(idx, text, cls){
+  const row = $('seg-'+idx);
+  if(!row) return;
+  const st = row.querySelector('.st');
+  st.textContent = text;
+  st.className = 'st ' + (cls||'');
+}
+
+async function runTTSStep(){
+  const logEl = $('log3');
+  const ctx = new (window.AudioContext||window.webkitAudioContext)();
+  const sr = state.sampleRate;
+  const totalDur = state.videoDuration;
+  const master = ctx.createBuffer(1, Math.ceil(totalDur*sr)+sr, sr);
+  const masterData = master.getChannelData(0);
+
+  for(let i=0;i<state.segments.length;i++){
+    const seg = state.segments[i];
+    if(!seg.vietnamese || !seg.vietnamese.trim()){ setSegStatus(i,'bỏ qua'); continue; }
+    setSegStatus(i,'đang tạo','run');
+    try{
+      const b64 = await ttsGenerate(seg.vietnamese);
+      const segBuf = pcm16ToAudioBuffer(b64, sr, ctx);
+      const startSample = Math.floor(seg.start*sr);
+      const segData = segBuf.getChannelData(0);
+      for(let j=0;j<segData.length && (startSample+j)<masterData.length; j++){
+        masterData[startSample+j] += segData[j];
+      }
+      setSegStatus(i,'xong','ok');
+      log(logEl, `✓ [${seg.start.toFixed(0)}s] ${seg.vietnamese.slice(0,40)}...`, 'ok');
+    }catch(err){
+      setSegStatus(i,'lỗi','err');
+      log(logEl, `✗ [${seg.start.toFixed(0)}s] ${err.message}`, 'e');
+    }
+    setBar('bar3', ((i+1)/state.segments.length)*100);
+  }
+  state.dubbedMaster = master;
+  markDone('step3');
+  unlock('step4');
+
+  // offer standalone audio download immediately
+  const wav = audioBufferToWav(master);
+  addDownload('Tải âm thanh lồng tiếng (.wav)', URL.createObjectURL(wav), 'long-tieng.wav');
+}
+
+$('btnRender').addEventListener('click', renderFinalVideo);
+
+async function renderFinalVideo(){
+  const logEl = $('log4');
+  $('btnRender').disabled = true;
+  try{
+    const video = document.createElement('video');
+    video.src = URL.createObjectURL(state.videoFile);
+    video.muted = false; // we mute via volume for original, but keep track for captureStream audio replace
+    await new Promise(r=> video.onloadedmetadata = r);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const cctx = canvas.getContext('2d');
+
+    const actx = new (window.AudioContext||window.webkitAudioContext)();
+    const dest = actx.createMediaStreamDestination();
+    const src = actx.createBufferSource();
+    src.buffer = state.dubbedMaster;
+    src.connect(dest);
+
+    const canvasStream = canvas.captureStream(30);
+    const combined = new MediaStream([...canvasStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+
+    const chunks = [];
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' : 'video/webm';
+    const recorder = new MediaRecorder(combined, {mimeType});
+    recorder.ondataavailable = e=>{ if(e.data.size>0) chunks.push(e.data); };
+
+    const donePromise = new Promise(resolve=>{ recorder.onstop = resolve; });
+
+    log(logEl, `Bắt đầu ghi (~${state.videoDuration.toFixed(0)}s, giữ tab này mở)...`);
+    video.currentTime = 0;
+    video.volume = 0; // mute original audio in playback (visual only needed)
+    recorder.start();
+    src.start();
+    await video.play();
+
+    const drawLoop = ()=>{
+      if(video.ended || video.paused) return;
+      cctx.drawImage(video,0,0,canvas.width,canvas.height);
+      setBar('bar4', (video.currentTime/state.videoDuration)*100);
+      requestAnimationFrame(drawLoop);
+    };
+    drawLoop();
+
+    video.onended = ()=>{ recorder.stop(); };
+    await donePromise;
+
+    const blob = new Blob(chunks, {type:'video/webm'});
+    log(logEl, '✓ Ghi xong!', 'ok');
+    addDownload('Tải video đã lồng tiếng (.webm)', URL.createObjectURL(blob), 'phim-long-tieng.webm');
+    setBar('bar4',100);
+  }catch(err){
+    log(logEl, '✗ ' + err.message, 'e');
+    console.error(err);
+  }
+  $('btnRender').disabled = false;
+}
+
+function addDownload(label, url, filename){
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.textContent = label;
+  a.style.cssText = 'display:inline-block;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);padding:9px 16px;border-radius:8px;text-decoration:none;font-size:13.5px;';
+  $('downloads').appendChild(a);
+}
+</script>
+</body>
+</html>

@@ -42,7 +42,6 @@
   }
   header p{color:var(--ink-dim);font-size:15.5px;max-width:56ch;margin:0 auto;}
 
-  /* --- CSS CHO ĐỒNG HỒ --- */
   #globalTimer {
     display: none;
     max-width: 280px;
@@ -91,9 +90,12 @@
   .row{display:flex;gap:12px;flex-wrap:wrap;}
   .row > div{flex:1;min-width:160px;}
 
+  /* SỬA LẠI CSS CHO Ô CHỌN FILE */
   .filedrop{
+    display: block; /* Ép thành khối để dễ click */
     border:1.5px dashed var(--line);border-radius:10px;padding:22px;text-align:center;
     color:var(--ink-dim);font-size:14px;cursor:pointer;margin-top:14px;transition:border-color .2s;
+    user-select: none; /* Không cho phép bôi đen chữ */
   }
   .filedrop:hover{border-color:var(--accent-dim); color: #fff;}
   .filedrop.has-file{border-style:solid;border-color:var(--ok);color:var(--ink);}
@@ -143,7 +145,6 @@
     <h1>Công cụ lồng tiếng AI tự động<br>Phát triển bởi [TÊN CỦA BẠN]</h1>
     <p>Hệ thống siêu nhẹ chạy hoàn toàn trên trình duyệt. Tự động bóc băng, dịch thuật và ghép video tốc độ cao bằng sức mạnh của Gemini 1.5 Flash.</p>
     
-    <!-- KHUNG ĐỒNG HỒ -->
     <div id="globalTimer">
       ⏱️ Thời gian xử lý: <span id="timeElapsed">00:00</span>
     </div>
@@ -157,11 +158,16 @@
       <div class="card">
         <h2>Xác thực API & Chọn Video</h2>
         <div class="sub">Dán Gemini API key của bạn vào đây (Key chỉ lưu tạm thời trên máy bạn, tuyệt đối an toàn) và tải video lên.</div>
+        
         <label for="apiKey">Khóa bảo mật (Gemini API Key)</label>
         <input type="password" id="apiKey" placeholder="Dán mã AIza... của bạn vào đây">
-        <div class="filedrop" id="dropZone">📂 Bấm để chọn file video gốc (.mp4, .webm)</div>
+        
+        <!-- BẢN FIX VŨ KHÍ TỐI THƯỢNG: Dùng thẻ label trỏ thẳng vào input -->
+        <label for="videoInput" class="filedrop" id="dropZone">📂 Bấm vào bất kỳ đâu trong khung này để chọn file video (.mp4, .webm)</label>
         <input type="file" id="videoInput" accept="video/*" style="display:none">
+        
         <video id="preview" style="display:none" controls></video>
+        
         <label for="voiceSel" style="margin-top:14px">Giọng đọc lồng tiếng (Tiếng Việt)</label>
         <select id="voiceSel">
           <option value="Kore">Giọng Nữ - Trầm ấm, chững chạc (Kore)</option>
@@ -170,6 +176,7 @@
           <option value="Zephyr">Giọng Nữ - Tươi sáng, truyền cảm (Zephyr)</option>
           <option value="Fenrir">Giọng Nam - Mạnh mẽ, quyết đoán (Fenrir)</option>
         </select>
+        
         <details style="margin-top:14px">
           <summary style="cursor:pointer;color:var(--ink-dim);font-size:13px;">Tuỳ chọn nâng cao (Cho phim dài)</summary>
           <div style="margin-top:10px">
@@ -177,6 +184,7 @@
             <input type="text" id="chunkLen" value="0.5">
           </div>
         </details>
+        
         <button id="btnStart1">🚀 BƯỚC 1: BẮT ĐẦU PHÂN TÍCH ÂM THANH</button>
       </div>
     </div>
@@ -262,7 +270,7 @@ function unlock(stepId){ $(stepId).classList.remove('locked'); $(stepId).classLi
 function markDone(stepId){ $(stepId).classList.remove('active'); $(stepId).classList.add('done'); }
 function setBar(id, pct){ $(id).style.width = Math.max(0,Math.min(100,pct)) + '%'; }
 
-$('dropZone').addEventListener('click', ()=> $('videoInput').click());
+// ĐÃ XÓA JAVASCRIPT GÂY LỖI CLICK, SỬ DỤNG HTML LABEL NATIVE
 $('videoInput').addEventListener('change', e=>{
   const f = e.target.files[0];
   if(!f) return;
@@ -391,7 +399,6 @@ async function uploadFileToGemini(blob, mimeType, displayName){
   return file;
 }
 
-// ĐÃ VIẾT LẠI HOÀN TOÀN HÀM NÀY BẰNG CẤU TRÚC API CHÍNH THỨC 
 async function transcribeAndTranslateChunk(fileUri, mimeType, offsetSec){
   const prompt = `Bạn là biên dịch phim chuyên nghiệp, chuyên viết lời thoại lồng tiếng. Nghe đoạn audio này và trả về DUY NHẤT một mảng JSON hợp lệ, không kèm giải thích. Mỗi phần tử có dạng:
 {"start": <giây>, "end": <giây>, "original": "<lời thoại gốc>", "vietnamese": "<bản dịch>"}
